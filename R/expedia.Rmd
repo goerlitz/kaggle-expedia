@@ -1,0 +1,98 @@
+---
+title: "expedia"
+output: html_document
+---
+
+
+```{r, echo=FALSE, message=FALSE}
+library(ggplot2)    # Data visualization
+library(data.table) # Faster data reading
+library(dplyr)      # Data aggregation etc.
+library(scales)     # Plot scaling
+library(corrplot)   # Correlations
+```
+
+# Loading and Transforming Data
+
+```{r, echo=FALSE}
+train <- fread("xzcat ../data/train1M.csv.xz", header = TRUE)
+
+# convert to factors
+cols <- colnames(train)
+nonfactor <- c("date_time", "srch_ci", "srch_co", "orig_destination_distance")
+for (i in cols[!cols %in% nonfactor] ) {
+  train[[i]] <- as.factor(train[[i]])
+}
+
+# convert to dates
+train$date_time <- as.POSIXct(train$date_time)
+train$srch_ci <- as.Date(train$srch_ci)
+train$srch_co <- as.Date(train$srch_co)
+train$date <- as.Date(train$date_time)
+train$Year  <- as.numeric(format(train$date, "%Y"))
+train$Month <- as.numeric(format(train$date, "%m"))
+```
+
+## Descriptive Statistics
+
+```{r, echo=FALSE}
+str(train)
+```
+
+```{r, echo=FALSE}
+
+grouping <- function(cat, cat_name) {
+  train.agg <- train %>% group_by(Year, Month, cat) %>% summarize(count=n())
+  train.agg$date <- as.POSIXct(paste(train.agg$Year, train.agg$Month, "01", sep = "-")) # set date to first of month
+  
+  ggplot(train.agg, aes(x = date, y = count, group = cat, col = cat)) +
+  geom_line(size=0.2) +
+#  facet_wrap(~Category, ncol = 5, scales = "free_y") +
+  theme(legend.title=element_text(cat_name),
+        axis.text=element_text(size=7),
+        strip.text = element_text(size = 9)) +
+  scale_y_continuous(limits = c(0, NA)) +
+  labs(title=paste("Daily events:", cat_name))
+}
+
+grouping(train$is_booking, "is_booking")
+grouping(train$is_mobile, "is_mobile")
+grouping(train$is_package, "is_package")
+grouping(train$channel, "channel")
+grouping(train$srch_adults_cnt, "srch_adults_cnt")
+grouping(train$srch_children_cnt, "srch_children_cnt")
+
+grouping(train$posa_continent, "posa_continent")
+
+
+#table(train$hotel_continent)
+#table(train$hotel_country)
+```
+
+* Exploration
+  * site/country
+  * channel
+  * continent
+  * country/region/city
+  * user bookings
+  * distance
+  * mobile
+  * package
+  * adults/children
+
+
+* Engineering
+  * Day of Week
+  * Morning Evening
+  * duration of stay
+  * time to departure
+  * domestic/ continental / intercontinental
+  
+* customer-specific
+  * #bookings
+  * #bookings in last year
+* hotel-specific
+
+
+* recommendation
+  *
