@@ -73,8 +73,17 @@ train$date_time <- as.POSIXct(train$date_time)
 train$srch_ci <- as.Date(train$srch_ci)
 train$srch_co <- as.Date(train$srch_co)
 train$date <- as.Date(train$date_time)
+#train$week <- cut(train$date, "weeks")
 train$Year  <- as.numeric(format(train$date, "%Y"))
 train$Month <- as.numeric(format(train$date, "%m"))
+
+# more feature engineering
+train$durStay <- as.numeric(train$srch_co - train$srch_ci)
+train$durStay[train$srch_ci > train$srch_co] <- -1
+
+train$timeToDep <- as.numeric(train$srch_ci - train$date)
+train$timeToDep[train$timeToDep < 0] <- -1
+train$timeToDep[train$timeToDep > 1000] <- -1
 ```
 
 ## Descriptive Statistics
@@ -85,32 +94,62 @@ str(train)
 
 ```{r, echo=FALSE}
 
-grouping <- function(cat, cat_name) {
-  train.agg <- train %>% group_by(Year, Month, cat) %>% summarize(count=n())
-  train.agg$date <- as.POSIXct(paste(train.agg$Year, train.agg$Month, "01", sep = "-")) # set date to first of month
+datePlot <- function(cat_name) {
+  column <- train[[cat_name]]
+  train.agg <- train %>% group_by(date, column) %>% summarize(count=n())
+#  train.agg <- train %>% group_by(Year, Month, cat) %>% summarize(count=n())
+#  train.agg$date <- as.POSIXct(paste(train.agg$Year, train.agg$Month, "01", sep = "-")) # set date to first of month
   
-  ggplot(train.agg, aes(x = date, y = count, group = cat, col = cat)) +
-  geom_line(size=0.2) +
-#  facet_wrap(~Category, ncol = 5, scales = "free_y") +
-  theme(legend.title=element_text(cat_name),
-        axis.text=element_text(size=7),
-        strip.text = element_text(size = 9)) +
-  scale_y_continuous(limits = c(0, NA)) +
-  labs(title=paste("Daily events:", cat_name))
+  ggplot(train.agg, aes(x = date, y = count, group = column, color = column)) +
+    geom_line(size=0.2) +
+    theme(axis.text=element_text(size=7),
+          strip.text = element_text(size = 9)) +
+    scale_y_continuous(limits = c(0, NA)) +
+    scale_color_discrete(name = cat_name) + # name of line legend
+    labs(title=paste("Daily events:", cat_name))
 }
 
-grouping(train$is_booking, "is_booking")
-grouping(train$is_mobile, "is_mobile")
-grouping(train$is_package, "is_package")
-grouping(train$channel, "channel")
-grouping(train$srch_adults_cnt, "srch_adults_cnt")
-grouping(train$srch_children_cnt, "srch_children_cnt")
+barPlot <- function(cat_name, legendpos = "right") {
+  column <- train[[cat_name]]
+  ggplot(train, aes(x=column, fill=column)) + geom_bar() +
+    labs(title=paste("Number of", cat_name)) +
+    theme(legend.position=legendpos)
+}
 
-grouping(train$posa_continent, "posa_continent")
+datePlot("is_booking")
+datePlot("is_mobile")
+datePlot("is_package")
+datePlot("channel")
+datePlot("srch_adults_cnt")
+datePlot("srch_children_cnt")
+datePlot("posa_continent")
 
+barPlot("posa_continent")
+barPlot("is_booking")
+barPlot("is_mobile")
+barPlot("is_package")
+barPlot("channel")
+barPlot("srch_adults_cnt")
+barPlot("srch_children_cnt")
+barPlot("srch_rm_cnt")
+barPlot("cnt")
+barPlot("hotel_cluster", "none")
+barPlot("hotel_continent")
+barPlot("hotel_country", "none")
+barPlot("hotel_market", "none")
 
-#table(train$hotel_continent)
-#table(train$hotel_country)
+barPlot("durStay")
+
+dur <- train %>% group_by(durStay) %>% summarize(count=n())
+ggplot(dur, aes(x=durStay, y=count)) + geom_line()
+
+ttd <- train %>% group_by(timeToDep) %>% summarize(count=n())
+ggplot(ttd, aes(x=timeToDep, y=count)) + geom_line()
+
+users <- data.frame(table(train[train$is_booking == 1]$user_id))
+colnames(users) <- c("user_id", "freq")
+usr <- users %>% group_by(freq) %>% summarize(count=n())
+ggplot(usr, aes(x=freq, y=count)) + geom_line()
 ```
 
 * Exploration
